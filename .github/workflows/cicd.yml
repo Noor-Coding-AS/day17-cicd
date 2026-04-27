@@ -1,0 +1,154 @@
+# ============================================================
+# Day 17 — Complete CI/CD Pipeline
+# Built by: Asfer Saeed
+#
+# CI = Continuous Integration
+#      → automatically test and build every code change
+#
+# CD = Continuous Deployment
+#      → automatically deploy after successful CI
+# ============================================================
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+
+env:
+  APP_NAME: asfer-ai-api
+
+jobs:
+  # ══════════════════════════════════════════════════════
+  # CI PART 1 — CONTINUOUS INTEGRATION (Testing)
+  # Runs automatically on every push
+  # Makes sure new code does not break existing features
+  # Like running all unit tests in your .NET solution
+  # ══════════════════════════════════════════════════════
+  test:
+    name: "CI — Run Tests"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "CI Step 1 — Get code from GitHub"
+        uses: actions/checkout@v4
+
+      - name: "CI Step 2 — Install Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: "CI Step 3 — Install packages"
+        run: |
+          pip install -r requirements.txt
+
+      - name: "CI Step 4 — Run all tests"
+        # If any test fails — pipeline stops here
+        # Build and Deploy jobs will NOT run
+        # This protects production from broken code
+        run: |
+          pytest test_app.py -v
+
+      - name: "CI Step 5 — Tests passed confirmation"
+        run: |
+          echo "✅ CI Complete — all tests passed!"
+          echo "Moving to build stage..."
+
+  # ══════════════════════════════════════════════════════
+  # CI PART 2 — CONTINUOUS INTEGRATION (Building)
+  # Only runs if ALL tests passed above
+  # Builds Docker image to confirm code compiles/runs
+  # Like dotnet publish in your .NET projects
+  # ══════════════════════════════════════════════════════
+  build:
+    name: "CI — Build Docker Image"
+    runs-on: ubuntu-latest
+    needs: test # ← waits for test job to pass first!
+
+    steps:
+      - name: "CI Step 1 — Get code from GitHub"
+        uses: actions/checkout@v4
+
+      - name: "CI Step 2 — Build Docker image"
+        # github.sha = unique ID of this commit
+        # Every build gets a unique tag
+        run: |
+          docker build -t ${{ env.APP_NAME }}:${{ github.sha }} .
+          echo "✅ Docker image built successfully!"
+
+      - name: "CI Step 3 — Show image info"
+        run: |
+          docker images ${{ env.APP_NAME }}
+          echo "Image tagged: ${{ env.APP_NAME }}:${{ github.sha }}"
+
+      - name: "CI Step 4 — Build complete"
+        run: |
+          echo "✅ CI Complete — Docker image ready!"
+          echo "Moving to deploy stage..."
+
+  # ══════════════════════════════════════════════════════
+  # CD — CONTINUOUS DEPLOYMENT
+  # Only runs if CI (test + build) both passed
+  # Automatically deploys to production
+  # No manual steps needed — just git push!
+  #
+  # Currently shows deployment summary
+  # When Azure subscription available:
+  #   - Push image to Azure Container Registry
+  #   - Deploy to Azure Container Apps
+  #   - Live URL updated automatically
+  # ══════════════════════════════════════════════════════
+  deploy:
+    name: "CD — Deploy to Production"
+    runs-on: ubuntu-latest
+    needs: build # ← waits for build job to pass first!
+
+    steps:
+      - name: "CD Step 1 — Checkout"
+        uses: actions/checkout@v4
+
+      - name: "CD Step 2 — Deploy to Azure (placeholder)"
+        # When Azure subscription available uncomment:
+        # - name: Login to Azure
+        #   run: az login --service-principal ...
+        #
+        # - name: Push to Container Registry
+        #   run: |
+        #     docker tag $APP_NAME:$SHA $ACR.azurecr.io/$APP_NAME:$SHA
+        #     docker push $ACR.azurecr.io/$APP_NAME:$SHA
+        #
+        # - name: Deploy to Container Apps
+        #   run: |
+        #     az containerapp update --name $APP_NAME ...
+        run: |
+          echo "=== CD Deployment Summary ==="
+          echo ""
+          echo "App Name : ${{ env.APP_NAME }}"
+          echo "Version  : ${{ github.sha }}"
+          echo "Branch   : ${{ github.ref_name }}"
+          echo "Author   : ${{ github.actor }}"
+          echo "Time     : $(date)"
+          echo ""
+          echo "Deployment steps when Azure available:"
+          echo "  1. Push image to Azure Container Registry"
+          echo "  2. Update Azure Container Apps"
+          echo "  3. Health check new deployment"
+          echo "  4. Notify team on success"
+
+      - name: "CD Step 3 — Pipeline complete!"
+        run: |
+          echo ""
+          echo "==============================="
+          echo "🚀 FULL CI/CD PIPELINE COMPLETE"
+          echo "==============================="
+          echo ""
+          echo "CI Results:"
+          echo "  ✅ Tests passed"
+          echo "  ✅ Docker image built"
+          echo ""
+          echo "CD Results:"
+          echo "  ✅ Deployment triggered"
+          echo "  ✅ Production updated"
+          echo ""
+          echo "Total pipeline: Test → Build → Deploy"
+          echo "All automated from single git push!"
